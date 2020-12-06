@@ -1,0 +1,7 @@
+(executable
+  (name obfuscator)
+  (libraries openQASM))
+
+(env
+  (dev
+    (flags (:standard -w -3-39))))

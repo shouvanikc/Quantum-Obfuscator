@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<title>README.html</title>
+<meta http-equiv="Content-Type" content="application/xhtml+xml;charset=utf-8"/>
+<link rel="stylesheet" type="text/css" media="all" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css"  />
+<link rel="stylesheet" type="text/css" media="all" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/styles/github.min.css"  /><meta name='viewport' content='width=device-width, initial-scale=1, shrink-to-fit=no'><style> body { box-sizing: border-box; max-width: 740px; width: 100%; margin: 40px auto; padding: 0 10px; } </style><script src='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/highlight.min.js'></script><script>document.addEventListener('DOMContentLoaded', () => { document.body.classList.add('markdown-body'); document.querySelectorAll('pre[lang] > code').forEach((code) => { code.classList.add(code.parentElement.lang); }); document.querySelectorAll('pre > code').forEach((code) => { hljs.highlightBlock(code); }); });</script>
+</head>
+
+<body>
+
+<h1 id="quantum-circuit-obfuscator">Quantum Circuit Obfuscator</h1>
+<p>This repository contains an implementation of an obfuscator for quantum circuits. It is the accompanying software artifact for the paper <strong>Scalable Verification of Quantum Supremacy based on Circuit Obfuscation</strong> <em>Shouvanik Chakrabarti, Chi-Ning Chou, Kai-Min Chung, and Xiaodi Wu</em>.</p>
+<h2 id="overview">Overview</h2>
+<p>The obfuscator takes as input a quantum circuit and increases the number of qubits (by 100) and the number of quantum gates, while producing an ‘obfuscated’ version of the circuit that is functionally equivalent.</p>
+<p>The obfuscator is based on primitives from <strong>SQIR</strong>, a Small Quantum Intermediate Representation for quantum programs, and the Verified Optimizer for Quantum Circuits <strong>(VOQC)</strong>. The repository is built upon a clone of the <a href="https://github.com/inQWIRE/SQIR">SQIR repository</a>. The implementation of the obfuscator is found under the Obfuscator subdirectory.</p>
+<h2 id="compilation">Compilation</h2>
+<p>To compile the obfuscator follow these instructions:</p>
+<p><strong>Dependencies</strong> We recommend using the Ocaml Package Manager <code>opam</code> to install these dependencies. Install opam using the appropriate instructions for your system found <a href="https://opam.ocaml.org/doc/Install.html">here</a>.</p>
+<ul>
+<li>OCaml version 4.08.1 (<code>opam switch create 4.08.1</code>)</li>
+<li>Coq version 8.10.1 (<code>opam pin add coq 8.10.1</code>)</li>
+<li>dune (<code>opam install dune</code>)</li>
+<li>menhir (<code>opam install menhir</code>)</li>
+<li>OCaml OpenQASM parser (<code>opam install openQASM</code>)</li>
+</ul>
+<p>Once the dependencies are installed the obfuscator can be compiled by running <code>make obfuscator</code> in the parent directory. This will produce an executable in Obfuscator/_build/default.</p>
+<h2 id="execution">Execution</h2>
+<p>All commands for running the obfuscator and the benchmarks are to be run in the Obfuscator subdirectory.</p>
+<h1 id="running-the-obfuscator">Running the obfuscator</h1>
+<p>In order to use the obfuscator executable run the command</p>
+<p><code>dune exec ./obfuscator.exe &lt;input_file&gt; &lt;output_file&gt; &lt;output_optimized_with_voqc&gt; --root extraction</code></p>
+<p>This returns an obfuscated version of <code>&lt;input_file&gt;</code> in <code>&lt;output_file&gt;</code>, and a version of <code>&lt;output_file&gt;</code> that has been further optimized by VOQC in <code>&lt;output_optimized_with_voqc&gt;</code>. For instance, to run the obfuscator on the benchmark <code>tof_5</code> and obtain the obfuscated output <code>out.qasm</code> and subsequently optimized circuit <code>optimized_voqc.qasm</code> run the command</p>
+<p><code>dune exec ./obfuscator.exe benchmarks/Arithmetic_and_Toffoli/tof_5.qasm out.qasm optimized_voqc.qasm --root extraction</code></p>
+<h1 id="running-the-benchmarks">Running the benchmarks</h1>
+<p>The benchmark script has the following depencencies. * <strong>Python</strong>: The benchmarking script requires a working Python 3 distribution that can be obtained <a href="https://www.python.org/downloads/">here</a>. * <strong>Qiskit</strong>: The Qiskit package can be installed using any python package manager. If <code>pip</code> is used, simply run <code>pip install numpy</code>. * <strong>staq</strong> : A clone of the staq repository is included under Obfuscator/benchmarks/staq. To build the executable for a UNIX based system with <code>cmake</code> and a C++ distribution , run the following commands in this directory</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="bu">cd</span> build</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="fu">cmake</span> ..</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a><span class="fu">make</span> staq</span></code></pre></div>
+<p>For other systems follow the <a href="https://github.com/softwareQinc/staq">installation instructions</a> for staq in the directory Obfuscator/benchmarks/staq.</p>
+<p>Given all the dependencies the script <code>Obfuscator/run_benchmark.py</code> will execute all the benchmarks and return CSV formatted results in a file given as input. Running the command</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="ex">python</span> run_benchmarks.py results.csv</span></code></pre></div>
+<p>in the Obfuscator directory will return the results in results.csv.</p>
+<h2 id="main-components">Main components</h2>
+<p>The main source components of the obfuscator can be found in</p>
+<ul>
+<li><code>Obfuscator/src/obfuscator/ReverseOptimizations.v</code> : contains the main primitives that are combined to form the obfuscator.</li>
+<li><code>Obfuscator/extraction/obfuscator.ml</code> : contains the implementation of the obfuscator executable.</li>
+<li><code>Obfuscator/run_benchmarks.py</code> : contains the code that reproduces the numerical benchmarks found in the paper.</li>
+</ul>
+
+</body>
+</html>

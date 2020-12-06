@@ -1,0 +1,17 @@
+-R . Top
+#-arg -profile-ltac
+
+externals/QWIRE/Prelim.v
+externals/QWIRE/RealAux.v
+externals/QWIRE/Complex.v
+externals/QWIRE/Matrix.v
+externals/QWIRE/Quantum.v
+externals/QWIRE/Dirac.v
+externals/QWIRE/Proportional.v
+
+SQIR/src/SQIR.v
+SQIR/src/UnitarySem.v
+SQIR/src/DensitySem.v
+SQIR/src/NDSem.v
+SQIR/src/ClassicalStates.v
+SQIR/src/Composition.v
