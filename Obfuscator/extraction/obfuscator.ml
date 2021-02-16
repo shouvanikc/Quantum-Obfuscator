@@ -188,11 +188,14 @@ let rec obfuscate num_epochs dim additions num_growth num_permute active ancilla
 
 Random.init 42;;
 
-if (Array.length Sys.argv <> 4)
-then print_endline "Expected usage: voqc <prog> <out> <out_voqc>"
+if (Array.length Sys.argv <> 7)
+then print_endline "Expected usage: voqc <prog> <out> <out_voqc> <qubit_growth> <depth_growth> <num_permute>"
 else let fname = Sys.argv.(1) in
      let outf = Sys.argv.(2) in
      let outf_voqc = Sys.argv.(3) in
+  let qubit_growth = int_of_string (Sys.argv.(4)) in
+  let depth_growth = int_of_string (Sys.argv.(5)) in
+  let num_permute = int_of_string (Sys.argv.(6)) in
      let _ = printf "Processing %s\n" fname in
      let (p, n) = get_gate_list fname in
      let origT = match get_t_count p with
@@ -203,14 +206,13 @@ else let fname = Sys.argv.(1) in
      let _ = printf "Initial number of qubits: %d\n" n in
      let _ = printf "Initial average depth: %d\n" ((List.length p)/n) in
      let init_depth = ((List.length p)/n) in
-     let target_depth = init_depth in
+     let target_depth = init_depth + depth_growth in
      let dim1 = n in
-     let target_dim = dim1 + 100 in
+     let target_dim = dim1 + qubit_growth in
      let num_growth = 5 in
      let num_epochs = (target_dim - dim1)/(2 * num_growth) in
      let target_size = (dim1 + (2*num_epochs*num_growth))*target_depth in
      let extra_size = target_size - (List.length p) in
-     let num_permute = 5 in
      let num_cnots = 40 in
      let num_local = 100 in
      let num_obfuscations = 2 in
