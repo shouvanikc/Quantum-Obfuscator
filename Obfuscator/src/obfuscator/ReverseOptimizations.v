@@ -9,29 +9,8 @@ Require Import List.
 Require Import Optimize.
 Open Scope ucom.
 
-(* Hadamard Reduction Optimization
-   
-   Routines to undo each of the following optimizations
 
-   #1  - H q; P q; H q ≡ P† q; H q; P† q 
-   #2  - H q; P† q; H q ≡ P q; H q; P q 
-   #3  - H q1; H q2; CNOT q1 q2; H q1; H q2 ≡ CNOT q2 q1 
-   #4  - H q2; P q2; CNOT q1 q2; P† q2; H q2 ≡ P† q2; CNOT q1 q2; P q2 
-   #5  - H q2; P† q2; CNOT q1 q2; P q2; H q2 ≡ P q2; CNOT q1 q2; P† q2 
- *)
-
-(* Fixpoint get_shifted_gate_list {dim} (q1 q2 : nat) (l : Rzk_ucom_l dim) := *)
-(*   match (next_single_qubit_gate l q1) with *)
-(*   | None => match (next_two_qubit_gate l q1) with *)
-(*            | None => [] *)
-(*            | Some (l1, URzk_CNOT, m, n, l2) => if (m =? q1) *)
-(*                                               then [CNOT q2 n] ++ (get_shifted_gate_list q1 q2 l2) *)
-(*                                               else [CNOT m q2] ++ (get_shifted_gate_list q1 q2 l2) *)
-(*            | Some(l1, _, m, n, l2) => (get_shifted_gate_list q1 q2 l2) *)
-(*            end *)
-(*   | Some (l1, g, l2) => [] *)
-(*   end. *)
-
+(* Get list of gates with qubit q1 replaced by q2, ie. every gate that acted on q1 in l, acts on q2 in the returned list *)
 Fixpoint get_shifted_gate_list {dim} (q1 q2 : nat) (l : Rzk_ucom_l dim) :=
   match l with
   | [] => []
@@ -52,6 +31,7 @@ Fixpoint get_shifted_gate_list {dim} (q1 q2 : nat) (l : Rzk_ucom_l dim) :=
                                    else (get_shifted_gate_list q1 q2 t)
   end.
 
+(* Return List of gates with q1 and q2 swapped, ie. every gate that acted on q1 now acts on q2 and vice versa *)
 Fixpoint swap_qubits {dim} (q1 q2 : nat) (l : Rzk_ucom_l dim) :=
   match l with
   | [] => []
@@ -71,6 +51,17 @@ Fixpoint swap_qubits {dim} (q1 q2 : nat) (l : Rzk_ucom_l dim) :=
                                       else (@App2 _ dim u m n) :: (swap_qubits q1 q2 t)
   | (App3 u m n p) :: t => (@App3 _ dim u m n p) :: (swap_qubits q1 q2 t)
   end.
+
+(* Hadamard Reduction Optimization
+
+   Routines to undo each of the following optimizations
+
+   #1  - H q; P q; H q ≡ P† q; H q; P† q
+   #2  - H q; P† q; H q ≡ P q; H q; P q
+   #3  - H q1; H q2; CNOT q1 q2; H q1; H q2 ≡ CNOT q2 q1
+   #4  - H q2; P q2; CNOT q1 q2; P† q2; H q2 ≡ P† q2; CNOT q1 q2; P q2
+   #5  - H q2; P† q2; CNOT q1 q2; P q2; H q2 ≡ P q2; CNOT q1 q2; P† q2
+ *)
 
 Definition undo_H_equivalence1 {dim} q (l : Rzk_ucom_l dim) :=
   replace_single_qubit_pattern l q
@@ -125,21 +116,13 @@ Definition undo_H_equivalence5 {dim} q (l : Rzk_ucom_l dim) :=
     end
   end.
 
-(* Examples *)
-Definition test1 : Rzk_ucom_l 2 := CNOT 0 1 :: T 0 :: [].
-Definition test2 : Rzk_ucom_l 2 := PDAG 0 :: H 0 :: PDAG 0 :: [].
-Definition test3 : Rzk_ucom_l 2 := P 1 :: H 1 :: P 1 :: [].
-Definition test4 : Rzk_ucom_l 2 := PDAG 0 :: CNOT 1 0 :: P 0 :: [].
-Definition test5 : Rzk_ucom_l 2 := P 0 :: CNOT 1 0 :: PDAG 0 :: [].
 
-Compute (undo_H_equivalence3 1 test1).
-Compute (undo_H_equivalence1 0 test2).
-Compute (undo_H_equivalence2 1 test3).
-Compute (undo_H_equivalence4 0 test4).
-Compute (undo_H_equivalence5 0 test5).
-Compute (get_shifted_gate_list 0 1 test4).
-
-(* Rules for creating pairs of cancelling gates. After creating them we attempt to use the commuting rules to move them far away from each other *)
+(* Rules for creating pairs of cancelling gates. After creating them we attempt to use the commuting rules to move them far away from each other.
+Each single qubit gate <G> has the following set of functions defined below.
+1. <G>_create_rule' q l : Returns a sequence of <G> and its inverse acting on qubit q applied to the beginning of circuit l.
+2. <G>_create_rule n q l : Inserts <G> followed by <G'> on qubit q at the nth position of circuit l.
+3. add_obfuscated_<G> m n q l : Insert <G> using  (<G>_create_rule n q l) followed by m applications of each defined commutation rule to move the canceling gates away from each other.
+ *)
 
 Definition H_create_rule' {dim} q (l : Rzk_ucom_l dim) :=
   Some([H q] ++ [H q] ++ l).
@@ -157,7 +140,6 @@ Fixpoint H_create_rule {dim} n q (l : Rzk_ucom_l dim) :=
            end
   end.
 
-Compute (H_create_rule 2 0 test1).
 
 Definition add_obfuscated_H {dim} m n q (l : Rzk_ucom_l dim) :=
   match dim with
@@ -181,7 +163,6 @@ Definition add_obfuscated_H {dim} m n q (l : Rzk_ucom_l dim) :=
         end
   end.
 
-Compute (add_obfuscated_H 0 2 0 test2).
 
 Definition X_create_rule' {dim} q (l : Rzk_ucom_l dim) :=
   Some([X q] ++ [X q] ++ l).
@@ -199,7 +180,6 @@ Fixpoint X_create_rule {dim} n q (l : Rzk_ucom_l dim) :=
            end
   end.
 
-Compute (X_create_rule 2 0 test1).
 
 Definition add_obfuscated_X {dim} m n q (l : Rzk_ucom_l dim) :=
   match dim with
@@ -223,7 +203,6 @@ Definition add_obfuscated_X {dim} m n q (l : Rzk_ucom_l dim) :=
         end
   end.
 
-Compute (add_obfuscated_X 0 2 0 test2).
 
 Definition Rz_create_rule' {dim} i q (l : Rzk_ucom_l dim) :=
   Some([Rz i q] ++ [Rz (32768 - i) q] ++ l).
@@ -241,7 +220,6 @@ Fixpoint Rz_create_rule {dim} n i q (l : Rzk_ucom_l dim) :=
            end
   end.
 
-Compute (Rz_create_rule 2 3 0 test1).
 
 Definition add_obfuscated_Rz {dim} m n i q (l : Rzk_ucom_l dim) :=
   match dim with
@@ -265,7 +243,6 @@ Definition add_obfuscated_Rz {dim} m n i q (l : Rzk_ucom_l dim) :=
         end
   end.
 
-Compute (add_obfuscated_Rz 0 2 35 0 test1).
 
 Definition CNOT_create_rule' {dim} q1 q2 (l : Rzk_ucom_l dim) :=
   Some([CNOT q1 q2] ++ [CNOT q1 q2] ++ l).
@@ -283,7 +260,6 @@ Fixpoint CNOT_create_rule {dim} n q1 q2 (l : Rzk_ucom_l dim) :=
            end
   end.
 
-Compute (CNOT_create_rule 4 0 1 test1).
 
 Definition add_obfuscated_CNOT {dim} m n q1 q2 (l : Rzk_ucom_l dim) :=
   match dim with
@@ -323,11 +299,36 @@ Definition add_obfuscated_CNOT {dim} m n q1 q2 (l : Rzk_ucom_l dim) :=
         end
   end.
 
+
+(* Examples for testing, uncomment the next block to run *)
+
+(*
+Definition test1 : Rzk_ucom_l 2 := CNOT 0 1 :: T 0 :: [].
+Definition test2 : Rzk_ucom_l 2 := PDAG 0 :: H 0 :: PDAG 0 :: [].
+Definition test3 : Rzk_ucom_l 2 := P 1 :: H 1 :: P 1 :: [].
+Definition test4 : Rzk_ucom_l 2 := PDAG 0 :: CNOT 1 0 :: P 0 :: [].
+Definition test5 : Rzk_ucom_l 2 := P 0 :: CNOT 1 0 :: PDAG 0 :: [].
+
+Compute (undo_H_equivalence3 1 test1).
+Compute (undo_H_equivalence1 0 test2).
+Compute (undo_H_equivalence2 1 test3).
+Compute (undo_H_equivalence4 0 test4).
+Compute (undo_H_equivalence5 0 test5).
+Compute (get_shifted_gate_list 0 1 test4).
+
+Compute (H_create_rule 2 0 test1).
+Compute (add_obfuscated_H 0 2 0 test2).
+Compute (X_create_rule 2 0 test1).
+Compute (add_obfuscated_X 0 2 0 test2).
+Compute (Rz_create_rule 2 3 0 test1).
+Compute (add_obfuscated_Rz 0 2 35 0 test1).
+Compute (CNOT_create_rule 4 0 1 test1).
 Compute (add_obfuscated_CNOT 1 1 0 1 test1).
-                                               
+ *)
 
 (* Create obfuscated correlations *)
 
+(* Add empty ancilla qubits to circuit. *)
 Fixpoint expand_circuit {dim2} (dim1 : nat) (l' : Rzk_ucom_l dim2) :=
   match l' with
   | [] => []
@@ -336,6 +337,7 @@ Fixpoint expand_circuit {dim2} (dim1 : nat) (l' : Rzk_ucom_l dim2) :=
   | _ => []
   end.
 
+(* Shift circuit to last dim_2 qubits out of dim_1 *)
 Fixpoint offset_circuit {dim2} (dim1 : nat) (l' : Rzk_ucom_l dim2) :=
   match l' with
   | [] => []
@@ -344,6 +346,7 @@ Fixpoint offset_circuit {dim2} (dim1 : nat) (l' : Rzk_ucom_l dim2) :=
   | _ => []
   end.
 
+ (* Add reversed circuit to last dim2 qubits. *)
 Fixpoint add_comp_circuit_bottom {dim1 dim2} (l : Rzk_ucom_l dim1) (l' : Rzk_ucom_l dim2) :=
   match l' with
   | [] => l
@@ -352,6 +355,7 @@ Fixpoint add_comp_circuit_bottom {dim1 dim2} (l : Rzk_ucom_l dim1) (l' : Rzk_uco
   | _ => l
   end.
 
+(* Merge gate lists acconding to a given list of indices *)
 Fixpoint merge_random {dim} (top : Rzk_ucom_l dim) (bottom : Rzk_ucom_l dim) (mergerand: list nat) :=
   match top, bottom, mergerand with
   | [], _, _ => bottom
@@ -362,21 +366,19 @@ Fixpoint merge_random {dim} (top : Rzk_ucom_l dim) (bottom : Rzk_ucom_l dim) (me
   | h1 :: t1, h2 :: t2, _ :: t3 => h2 :: (merge_random top t2 t3)
   end.
 
+(* Add reverse of l2 to bottom of l1 *)
 Definition combine_circuits {dim1 dim2} (l1 : Rzk_ucom_l dim1) (l2 : Rzk_ucom_l dim2) :=
   (add_comp_circuit_bottom (expand_circuit (dim1 + dim2) l1) l2).
 
+(* Merge gates of two uncorrelated circuits. This transformation changes nothing, it simply controls where the correlation is added by the next routine. *)
 Definition combine_random {dim1 dim2} (l1 : Rzk_ucom_l dim1) (l2 : Rzk_ucom_l dim2) (mergerand: list nat) :=
   let top := expand_circuit (dim1 + dim2) l1 in
   let bottom := offset_circuit (dim1 + dim2) l2 in
   merge_random top bottom mergerand.
 
+(* Use obfuscated CNOT to connect two uncorrealated circuits. *)
 Definition single_obfuscated_correlation {dim1 dim2} m n q1 q2 (l1 : Rzk_ucom_l dim1) (l2 : Rzk_ucom_l dim2) :=
   add_obfuscated_CNOT m n q1 q2 (combine_circuits l1 l2).
-
-Compute (combine_circuits test1 test2).
-Compute (combine_circuits test2 test3).
-
-Compute (single_obfuscated_correlation 1 1 0 3 test1 test3).
 
 (* Teleportation *)
 
@@ -392,19 +394,15 @@ Fixpoint make_list (base size : nat) :=
   | S n => [base] ++ (make_list (base + 1) n)
   end.
 
+(* Create teleport subroutine to add to the beginning and end of circuits. *)
 Definition add_teleport {dim} orig ans des (l : Rzk_ucom_l dim) :=
   l ++ (H ans :: CNOT ans des :: CNOT orig ans :: H orig :: CNOT ans des :: H des :: CNOT orig des :: H des :: H orig :: H ans ::  []).
 
 Definition add_teleport_front {dim} orig ans des (l : Rzk_ucom_l dim) :=
   (H ans :: CNOT ans des :: CNOT orig ans :: H orig :: CNOT ans des :: H des :: CNOT orig des :: H des :: H orig :: H ans ::  []) ++ (swap_qubits orig des l).
 
-Fixpoint add_teleport_mid {dim} orig ans des (flag : nat) (l : Rzk_ucom_l dim) :=
-  match flag, l with
-  | 0, _ => add_teleport_front orig ans des l
-  | _, [] => add_teleport orig ans des l
-  | S n', h :: t => h :: (add_teleport_mid orig ans des n' t)
-  end.
 
+(* Routines to swap qubit to ancilla using teleportation routine. *)
 Fixpoint teleport_connect {dim} (orig ans des flags : list nat) (l : Rzk_ucom_l dim) :=
   match orig, ans, des, flags with
   | _, _, [], _ => l
@@ -454,6 +452,7 @@ Definition add_obfuscated_correlations {dim1 dim2} (mergerand nrand mrand l1rand
   let l := combine_random l1 l2 mergerand in
   add_random_obfuscated_CNOTs nrand mrand l1rand l2rand l.
 
+(* Create random circuits and add them to given circuit *)
 Fixpoint get_random_circuit (dim: nat) (crand: list nat) (qrand: list nat) (arand: list BinNums.Z) :  Rzk_ucom_l dim  :=
   match crand,qrand,arand with
   | [], _, _ => []
@@ -480,19 +479,20 @@ Fixpoint get_random_circuit' (dim: nat) (crand: list nat) (qrand: list nat) (ara
   | _, [], _ => []
   | _, _, [] => []
   | h :: t, h' :: t', h'' :: t'' => match h with
-                                | 0 => get_random_circuit dim t t' t'' 
-                                | 1 => X h' :: (get_random_circuit dim t t' t'')
-                                | 2 => X h' :: (get_random_circuit dim t t' t'')
-                                | 3 => Rz h'' h' :: (get_random_circuit dim t t' t'')
-                                | 4 => X h' :: (get_random_circuit dim t t' t'')
-                                | 5 => CNOT h' (h'+1 mod dim) :: (get_random_circuit dim t t' t'')
-                                | _ => get_random_circuit dim t t' t''
+                                | 0 => get_random_circuit' dim t t' t''
+                                | 1 => X h' :: (get_random_circuit' dim t t' t'')
+                                | 2 => X h' :: (get_random_circuit' dim t t' t'')
+                                | 3 => Rz h'' h' :: (get_random_circuit' dim t t' t'')
+                                | 4 => X h' :: (get_random_circuit' dim t t' t'')
+                                | 5 => CNOT h' (h'+1 mod dim) :: (get_random_circuit' dim t t' t'')
+                                | _ => get_random_circuit' dim t t' t''
                                 end
   end.
 
 Definition add_random_circuit {dim : nat} (crand : list nat) (qrand: list nat) (arand: list BinNums.Z) (l : Rzk_ucom_l dim):=
   l ++ (get_random_circuit' dim crand qrand arand).
 
+(* Attempt local obfuscations using given flags *)
 Fixpoint add_local_obfuscation {dim} (orand qorand norand morand : list nat) (aorand : list BinNums.Z) (l: Rzk_ucom_l dim) :=
   match orand, qorand, norand, morand, aorand with
   | [],_,_,_,_ => l
@@ -519,7 +519,7 @@ Fixpoint add_local_obfuscation {dim} (orand qorand norand morand : list nat) (ao
   end.
                                                            
                    
-
+(* Routines used by final obfuscator *)
 Definition obfuscate {dim} (dim2 : nat) (l : Rzk_ucom_l dim)
            (crand qrand : list nat) (arand : list BinNums.Z)
            (orand1 qorand1 norand1 morand1 : list nat) (arand1 : list BinNums.Z)
